@@ -1,0 +1,7 @@
+<svg width="280" height="240" viewBox="0 0 280 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0.5" y="0.5" width="279" height="239" rx="8" fill="rgba(37,99,235,0.08)" stroke="#2563EB" stroke-dasharray="8 8"/>
+  <rect x="88" y="106" width="104" height="28" rx="6" fill="rgba(255,255,255,0.9)"/>
+  <text x="140" y="125" text-anchor="middle" font-family="Inter, Arial" font-size="12" font-weight="600" fill="#2563EB">Print Area</text>
+</svg>
+
+

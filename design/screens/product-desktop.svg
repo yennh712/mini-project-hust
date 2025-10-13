@@ -1,0 +1,32 @@
+<svg width="1440" height="1024" viewBox="0 0 1440 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="1024" fill="#F9FAFB"/>
+  <!-- Left mockup -->
+  <g transform="translate(160, 160)">
+    <rect x="0" y="0" width="560" height="720" rx="12" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="40" y="40" width="480" height="640" rx="12" fill="#F3F4F6"/>
+    <image href="../components/print-area-overlay.svg" x="88" y="136" width="384" height="288"/>
+  </g>
+  <!-- Right panel -->
+  <g transform="translate(800, 160)">
+    <text x="0" y="0" font-family="Inter, Arial" font-size="32" font-weight="700" fill="#111827">Product Title</text>
+    <text x="0" y="36" font-family="Inter, Arial" font-size="24" font-weight="600" fill="#2563EB">150.000 VNĐ</text>
+    <text x="0" y="72" font-family="Inter, Arial" font-size="14" fill="#4B5563">Upload your design and preview it directly on the mockup.</text>
+    <g transform="translate(0, 112)">
+      <text x="0" y="0" font-family="Inter, Arial" font-size="14" font-weight="600" fill="#374151">Choose Color</text>
+      <image href="../components/color-chip.svg" x="0" y="12" width="96" height="32"/>
+      <image href="../components/color-chip.svg" x="104" y="12" width="96" height="32"/>
+      <image href="../components/color-chip.svg" x="208" y="12" width="96" height="32"/>
+    </g>
+    <g transform="translate(0, 176)">
+      <text x="0" y="0" font-family="Inter, Arial" font-size="14" font-weight="600" fill="#374151">Upload Design</text>
+      <image href="../components/button-primary.svg" x="0" y="12" width="200" height="48"/>
+    </g>
+    <g transform="translate(0, 256)">
+      <image href="../components/button-primary.svg" x="0" y="0" width="220" height="48"/>
+      <rect x="240" y="0" width="220" height="48" rx="8" fill="#10B981"/>
+      <text x="350" y="30" text-anchor="middle" font-family="Inter, Arial" font-size="16" font-weight="600" fill="#FFFFFF">Download Design</text>
+    </g>
+  </g>
+</svg>
+
+

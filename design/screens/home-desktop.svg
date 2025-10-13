@@ -1,0 +1,14 @@
+<svg width="1440" height="1024" viewBox="0 0 1440 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="1024" fill="#F9FAFB"/>
+  <text x="720" y="96" text-anchor="middle" font-family="Inter, Arial" font-size="40" font-weight="600" fill="#111827">Choose Your Product</text>
+  <text x="720" y="136" text-anchor="middle" font-family="Inter, Arial" font-size="16" fill="#4B5563">Select a product to customize with your design</text>
+  <!-- Grid of 4 cards -->
+  <g transform="translate(160, 200)">
+    <image href="../components/product-card.svg" x="0"   y="0"   width="320" height="420"/>
+    <image href="../components/product-card.svg" x="360" y="0"   width="320" height="420"/>
+    <image href="../components/product-card.svg" x="720" y="0"   width="320" height="420"/>
+    <image href="../components/product-card.svg" x="1080" y="0"  width="320" height="420"/>
+  </g>
+</svg>
+
+
