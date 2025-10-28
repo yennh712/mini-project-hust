@@ -13,6 +13,7 @@
             class="mockup-image"
             ref="mockupImage"
             @error="handleImageError"
+            @load="onMockupLoad"
             />
             <!-- Print Area Overlay -->
             <div class="print-area-overlay" :style="printAreaStyle">
@@ -144,29 +145,35 @@
             </div>
           </div>
 
-          <!-- File Upload (display only, no behavior) -->
+          <!-- File Upload -->
           <div class="form-section">
             <label class="form-label">Upload Design:</label>
             <div class="file-upload-container">
               <input 
+                ref="fileInput"
                 type="file" 
+                @change="handleUpload"
                 accept="image/*"
                 class="file-upload-input"
                 id="file-upload"
-                disabled
               />
-              <label for="file-upload" class="file-upload-button" style="opacity: 0.7; cursor: not-allowed;">
+              <label for="file-upload" class="file-upload-button">
                 <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
                 <span class="file-upload-text">Choose File</span>
               </label>
+              <div v-if="selectedFileName" class="file-name">
+                Selected: {{ selectedFileName }}
+              </div>
             </div>
           </div>
 
-          <!-- Action Buttons (display only, no behavior) -->
+          <!-- Action Buttons -->
           <div class="form-section" style="display: flex; gap: 1rem; flex-wrap: wrap;">
             <button 
+              @click="downloadDesign"
+              :disabled="!selectedFileName"
               class="download-button"
               style="
                 padding: 0.75rem 1.5rem;
@@ -174,13 +181,14 @@
                 color: white;
                 border-radius: 0.5rem;
                 border: none;
-                cursor: not-allowed;
-                opacity: 0.7;
+                cursor: pointer;
                 transition: background-color 0.2s;
                 flex: 1;
                 min-width: 150px;
               "
-              disabled
+              :style="!selectedFileName ? 'background-color: #9ca3af; cursor: not-allowed;' : ''"
+              @mouseover="selectedFileName && (this.style.backgroundColor='#059669')"
+              @mouseout="selectedFileName && (this.style.backgroundColor='#10b981')"
             >
               <svg style="width: 1rem; height: 1rem; margin-right: 0.5rem; display: inline-block; vertical-align: middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -195,7 +203,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { getProductById, getMockupImageByProductName } from "../data/products.js";
 
@@ -232,7 +240,7 @@ const printAreaStyle = computed(() => ({
   alignItems: 'center',
   justifyContent: 'center',
   pointerEvents: 'none',
-  zIndex: 1
+  zIndex: 3
 }));
 
 // Function to get the appropriate mockup image
@@ -249,14 +257,30 @@ const getMockupImage = () => {
   return '/src/assets/mockup-tshirt.png';
 };
 
+const sizeCanvasToContainer = () => {
+  if (!canvas.value) return;
+  const container = canvas.value.parentElement;
+  if (!container) return;
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+  if (canvas.value.width !== width || canvas.value.height !== height) {
+    canvas.value.width = width;
+    canvas.value.height = height;
+  }
+};
+
+const onMockupLoad = () => {
+  sizeCanvasToContainer();
+  drawPreview();
+};
+
 onMounted(() => {
   if (canvas.value) {
     ctx = canvas.value.getContext("2d");
-    // Set canvas size to match the mockup container
-    const container = canvas.value.parentElement;
-    canvas.value.width = container.offsetWidth;
-    canvas.value.height = container.offsetHeight;
+    sizeCanvasToContainer();
   }
+  drawPreview();
+  window.addEventListener('resize', handleResize, { passive: true });
   
   // Set default selections based on product data
   if (product.value) {
@@ -264,6 +288,15 @@ onMounted(() => {
     selectedSize.value = product.value.sizes?.[0] || "";
   }
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+});
+
+const handleResize = () => {
+  sizeCanvasToContainer();
+  drawPreview();
+};
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN').format(price);
@@ -278,12 +311,98 @@ const resetPrintArea = () => {
   };
 };
 
+watch(printAreaConfig, () => {
+  drawPreview();
+}, { deep: true });
+
 const handleImageError = (event) => {
   console.error('Mockup image failed to load:', event.target.src);
   // Try fallback image
   event.target.src = '/src/assets/mockup-tshirt.png';
 };
-// Upload/Download logic removed per request
+const selectedFileName = ref("");
+const fileInput = ref(null);
+let designImg = null;
+
+const handleUpload = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  selectedFileName.value = file.name;
+  const reader = new FileReader();
+  reader.onload = () => {
+    designImg = new Image();
+    designImg.onload = () => drawPreview();
+    designImg.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+const drawPreview = () => {
+  if (!ctx || !canvas.value) return;
+  const c = canvas.value;
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!designImg) return;
+  const area = {
+    x: (printAreaConfig.value.left / 100) * c.width,
+    y: (printAreaConfig.value.top / 100) * c.height,
+    w: (printAreaConfig.value.width / 100) * c.width,
+    h: (printAreaConfig.value.height / 100) * c.height
+  };
+  const aspect = designImg.width / designImg.height || 1;
+  let dw = area.w;
+  let dh = dw / aspect;
+  if (dh > area.h) {
+    dh = area.h;
+    dw = dh * aspect;
+  }
+  const dx = area.x + (area.w - dw) / 2;
+  const dy = area.y + (area.h - dh) / 2;
+  ctx.drawImage(designImg, dx, dy, dw, dh);
+};
+
+const downloadDesign = async () => {
+  if (!selectedFileName.value || !designImg || !mockupImage.value) {
+    alert('Please upload a design first');
+    return;
+  }
+  const c = document.createElement('canvas');
+  c.width = canvas.value.width;
+  c.height = canvas.value.height;
+  const cctx = c.getContext('2d');
+  // Draw mockup with contain-fit to preserve original aspect ratio
+  try {
+    const natW = mockupImage.value.naturalWidth || mockupImage.value.width;
+    const natH = mockupImage.value.naturalHeight || mockupImage.value.height;
+    const scale = Math.min(c.width / natW, c.height / natH);
+    const dw = Math.round(natW * scale);
+    const dh = Math.round(natH * scale);
+    const dx = Math.round((c.width - dw) / 2);
+    const dy = Math.round((c.height - dh) / 2);
+    cctx.drawImage(mockupImage.value, dx, dy, dw, dh);
+  } catch (e) {}
+  const area = {
+    x: (printAreaConfig.value.left / 100) * c.width,
+    y: (printAreaConfig.value.top / 100) * c.height,
+    w: (printAreaConfig.value.width / 100) * c.width,
+    h: (printAreaConfig.value.height / 100) * c.height
+  };
+  const aspect = designImg.width / designImg.height || 1;
+  let dw = area.w;
+  let dh = dw / aspect;
+  if (dh > area.h) {
+    dh = area.h;
+    dw = dh * aspect;
+  }
+  const dx = area.x + (area.w - dw) / 2;
+  const dy = area.y + (area.h - dh) / 2;
+  cctx.drawImage(designImg, dx, dy, dw, dh);
+  const link = document.createElement('a');
+  link.href = c.toDataURL('image/png');
+  link.download = selectedFileName.value.replace(/\.[^.]+$/, '') + '_mockup.png';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 </script>
 

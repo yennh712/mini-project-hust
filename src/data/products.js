@@ -8,8 +8,8 @@ export const products = [
     description: "Premium quality cotton t-shirt perfect for custom designs. Soft, comfortable, and durable.",
     colors: ["White", "Black", "Red", "Blue", "Yellow", "Brown"],
     sizes: ["S", "M", "L", "XL", "XXL"],
-    image: "/src/assets/mockup-tshirt.png",
-    mockupImage: "/src/assets/mockup-tshirt.png"
+    image: "/src/assets/mockup_tshirt.png",
+    mockupImage: "/src/assets/mockup_tshirt.png"
   },
   {
     id: 2,
@@ -19,8 +19,8 @@ export const products = [
     description: "High-quality polo shirt with a professional look. Perfect for business casual or custom branding.",
     colors: ["White", "Black", "Navy", "Gray", "Green"],
     sizes: ["S", "M", "L", "XL", "XXL"],
-    image: "/src/assets/mockup-polo.png",
-    mockupImage: "/src/assets/mockup-polo.png"
+    image: "/src/assets/mockup_polo.png",
+    mockupImage: "/src/assets/mockup_polo.png"
   },
   {
     id: 3,
@@ -30,8 +30,8 @@ export const products = [
     description: "Comfortable hoodie with front zipper. Great for casual wear and custom designs.",
     colors: ["Black", "Gray", "Navy", "Red"],
     sizes: ["S", "M", "L", "XL", "XXL"],
-    image: "/src/assets/mockup-hoodie.png",
-    mockupImage: "/src/assets/mockup-hoodie.png"
+    image: "/src/assets/mockup_hoodie.jpg",
+    mockupImage: "/src/assets/mockup_hoodie.jpg"
   },
   {
     id: 4,
@@ -41,8 +41,8 @@ export const products = [
     description: "Lightweight tank top perfect for summer. Ideal for custom designs and active wear.",
     colors: ["White", "Black", "Pink", "Blue", "Yellow"],
     sizes: ["S", "M", "L", "XL"],
-    image: "/src/assets/mockup-tank.png",
-    mockupImage: "/src/assets/mockup-tank.png"
+    image: "/src/assets/mockup_tank.jpg",
+    mockupImage: "/src/assets/mockup_tank.jpg"
   }
 ];
 
@@ -55,19 +55,15 @@ export const getMockupImageByProductName = (productName) => {
   const name = productName.toLowerCase();
   
   if (name.includes('t-shirt') || name.includes('tshirt')) {
-    return '/src/assets/mockup-tshirt.png';
+    return '/src/assets/mockup_tshirt.png';
   } else if (name.includes('polo')) {
-    return '/src/assets/mockup-polo.png';
+    return '/src/assets/mockup_polo.png';
   } else if (name.includes('hoodie')) {
-    return '/src/assets/mockup-hoodie.png';
+    return '/src/assets/mockup_hoodie.jpg';
   } else if (name.includes('tank')) {
-    return '/src/assets/mockup-tank.png';
-  } else if (name.includes('sweatshirt')) {
-    return '/src/assets/mockup-sweatshirt.png';
-  } else if (name.includes('long sleeve')) {
-    return '/src/assets/mockup-longsleeve.png';
+    return '/src/assets/mockup_tank.jpg';
   } else {
     // Default fallback
-    return '/src/assets/mockup-tshirt.png';
+    return '/src/assets/mockup_tshirt.png';
   }
 };
