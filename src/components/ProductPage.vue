@@ -56,7 +56,7 @@
                   min="0" 
                   max="100" 
                   step="1"
-                  style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem;"
+                style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; background-color: #ffffff; color: #111827;"
                 />
               </div>
               <div>
@@ -67,7 +67,7 @@
                   min="0" 
                   max="100" 
                   step="1"
-                  style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem;"
+                style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; background-color: #ffffff; color: #111827;"
                 />
               </div>
               <div>
@@ -78,7 +78,7 @@
                   min="1" 
                   max="100" 
                   step="1"
-                  style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem;"
+                style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; background-color: #ffffff; color: #111827;"
                 />
               </div>
               <div>
@@ -89,7 +89,7 @@
                   min="1" 
                   max="100" 
                   step="1"
-                  style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem;"
+                style="width: 100%; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; background-color: #ffffff; color: #111827;"
                 />
               </div>
             </div>
@@ -217,6 +217,7 @@ const selectedSize = ref("");
 const canvas = ref(null);
 const mockupImage = ref(null);
 let ctx = null;
+const mockupRect = ref({ x: 0, y: 0, w: 0, h: 0 });
 
 // Print Area Configuration
 const printAreaConfig = ref({
@@ -226,22 +227,29 @@ const printAreaConfig = ref({
   height: 60  // 60% height
 });
 
-// Computed style for print area overlay
-const printAreaStyle = computed(() => ({
-  position: 'absolute',
-  top: `${printAreaConfig.value.top}%`,
-  left: `${printAreaConfig.value.left}%`,
-  width: `${printAreaConfig.value.width}%`,
-  height: `${printAreaConfig.value.height}%`,
-  border: '2px dashed #3b82f6',
-  borderRadius: '0.5rem',
-  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-  zIndex: 3
-}));
+// Computed style for print area overlay (based on the actual mockup rect)
+const printAreaStyle = computed(() => {
+  const rect = mockupRect.value;
+  const topPx = rect.y + (printAreaConfig.value.top / 100) * rect.h;
+  const leftPx = rect.x + (printAreaConfig.value.left / 100) * rect.w;
+  const widthPx = (printAreaConfig.value.width / 100) * rect.w;
+  const heightPx = (printAreaConfig.value.height / 100) * rect.h;
+  return {
+    position: 'absolute',
+    top: `${Math.round(topPx)}px`,
+    left: `${Math.round(leftPx)}px`,
+    width: `${Math.round(widthPx)}px`,
+    height: `${Math.round(heightPx)}px`,
+    border: '2px dashed #3b82f6',
+    borderRadius: '0.5rem',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+    zIndex: 3
+  };
+});
 
 // Function to get the appropriate mockup image
 const getMockupImage = () => {
@@ -271,6 +279,7 @@ const sizeCanvasToContainer = () => {
 
 const onMockupLoad = () => {
   sizeCanvasToContainer();
+  updateMockupRect();
   drawPreview();
 };
 
@@ -279,6 +288,7 @@ onMounted(() => {
     ctx = canvas.value.getContext("2d");
     sizeCanvasToContainer();
   }
+  updateMockupRect();
   drawPreview();
   window.addEventListener('resize', handleResize, { passive: true });
   
@@ -295,6 +305,7 @@ onBeforeUnmount(() => {
 
 const handleResize = () => {
   sizeCanvasToContainer();
+  updateMockupRect();
   drawPreview();
 };
 
@@ -311,7 +322,22 @@ const resetPrintArea = () => {
   };
 };
 
+const clamp = (value, min, max) => {
+  const num = Number(value);
+  if (Number.isNaN(num)) return min;
+  return Math.min(max, Math.max(min, num));
+};
+
+const normalizePrintArea = () => {
+  const cfg = printAreaConfig.value;
+  cfg.width = clamp(cfg.width, 1, 100);
+  cfg.height = clamp(cfg.height, 1, 100);
+  cfg.top = clamp(cfg.top, 0, 100 - cfg.height);
+  cfg.left = clamp(cfg.left, 0, 100 - cfg.width);
+};
+
 watch(printAreaConfig, () => {
+  normalizePrintArea();
   drawPreview();
 }, { deep: true });
 
@@ -319,6 +345,24 @@ const handleImageError = (event) => {
   console.error('Mockup image failed to load:', event.target.src);
   // Try fallback image
   event.target.src = '/src/assets/mockup-tshirt.png';
+};
+const computeContainRect = (containerW, containerH, naturalW, naturalH) => {
+  if (!naturalW || !naturalH) return { x: 0, y: 0, w: containerW, h: containerH };
+  const scale = Math.min(containerW / naturalW, containerH / naturalH);
+  const w = Math.round(naturalW * scale);
+  const h = Math.round(naturalH * scale);
+  const x = Math.round((containerW - w) / 2);
+  const y = Math.round((containerH - h) / 2);
+  return { x, y, w, h };
+};
+
+const updateMockupRect = () => {
+  if (!canvas.value || !mockupImage.value) return;
+  const containerW = canvas.value.width;
+  const containerH = canvas.value.height;
+  const natW = mockupImage.value.naturalWidth || mockupImage.value.width || containerW;
+  const natH = mockupImage.value.naturalHeight || mockupImage.value.height || containerH;
+  mockupRect.value = computeContainRect(containerW, containerH, natW, natH);
 };
 const selectedFileName = ref("");
 const fileInput = ref(null);
@@ -342,11 +386,12 @@ const drawPreview = () => {
   const c = canvas.value;
   ctx.clearRect(0, 0, c.width, c.height);
   if (!designImg) return;
+  const rect = mockupRect.value;
   const area = {
-    x: (printAreaConfig.value.left / 100) * c.width,
-    y: (printAreaConfig.value.top / 100) * c.height,
-    w: (printAreaConfig.value.width / 100) * c.width,
-    h: (printAreaConfig.value.height / 100) * c.height
+    x: rect.x + (printAreaConfig.value.left / 100) * rect.w,
+    y: rect.y + (printAreaConfig.value.top / 100) * rect.h,
+    w: (printAreaConfig.value.width / 100) * rect.w,
+    h: (printAreaConfig.value.height / 100) * rect.h
   };
   const aspect = designImg.width / designImg.height || 1;
   let dw = area.w;
@@ -369,22 +414,19 @@ const downloadDesign = async () => {
   c.width = canvas.value.width;
   c.height = canvas.value.height;
   const cctx = c.getContext('2d');
-  // Draw mockup with contain-fit to preserve original aspect ratio
+  // Compute export mockup rect and draw mockup
+  let exportRect = { x: 0, y: 0, w: c.width, h: c.height };
   try {
     const natW = mockupImage.value.naturalWidth || mockupImage.value.width;
     const natH = mockupImage.value.naturalHeight || mockupImage.value.height;
-    const scale = Math.min(c.width / natW, c.height / natH);
-    const dw = Math.round(natW * scale);
-    const dh = Math.round(natH * scale);
-    const dx = Math.round((c.width - dw) / 2);
-    const dy = Math.round((c.height - dh) / 2);
-    cctx.drawImage(mockupImage.value, dx, dy, dw, dh);
+    exportRect = computeContainRect(c.width, c.height, natW, natH);
+    cctx.drawImage(mockupImage.value, exportRect.x, exportRect.y, exportRect.w, exportRect.h);
   } catch (e) {}
   const area = {
-    x: (printAreaConfig.value.left / 100) * c.width,
-    y: (printAreaConfig.value.top / 100) * c.height,
-    w: (printAreaConfig.value.width / 100) * c.width,
-    h: (printAreaConfig.value.height / 100) * c.height
+    x: exportRect.x + (printAreaConfig.value.left / 100) * exportRect.w,
+    y: exportRect.y + (printAreaConfig.value.top / 100) * exportRect.h,
+    w: (printAreaConfig.value.width / 100) * exportRect.w,
+    h: (printAreaConfig.value.height / 100) * exportRect.h
   };
   const aspect = designImg.width / designImg.height || 1;
   let dw = area.w;
