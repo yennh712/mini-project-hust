@@ -90,6 +90,48 @@
           </div>
         </div>
       </div>
+
+      <!-- Custom Mockup Option -->
+      <div class="custom-mockup-section" style="
+        margin-top: 3rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      ">
+        <p style="
+          color: #6b7280;
+          font-size: 0.875rem;
+          margin-bottom: 0.75rem;
+          font-weight: 400;
+        ">or</p>
+        <button 
+          class="custom-mockup-button"
+          style="
+            background-color: #e5e7eb;
+            color: #374151;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: inline-block;
+          "
+          @mouseover="this.style.backgroundColor='#d1d5db'"
+          @mouseout="this.style.backgroundColor='#e5e7eb'"
+        >
+          Choose Your Custom Mockup
+        </button>
+        <p style="
+          color: #6b7280;
+          font-size: 0.75rem;
+          margin-top: 0.5rem;
+          text-align: center;
+          max-width: 400px;
+        ">(You can upload your mockup or choose a mockup from our library)</p>
+      </div>
     </div>
   </div>
 </template>

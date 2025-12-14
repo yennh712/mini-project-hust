@@ -172,6 +172,31 @@
           <!-- Action Buttons -->
           <div class="form-section" style="display: flex; gap: 1rem; flex-wrap: wrap;">
             <button 
+              @click="saveDesign"
+              :disabled="!selectedFileName || isSaving"
+              class="save-button"
+              style="
+                padding: 0.75rem 1.5rem;
+                background-color: #3b82f6;
+                color: white;
+                border-radius: 0.5rem;
+                border: none;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                flex: 1;
+                min-width: 150px;
+              "
+              :style="(!selectedFileName || isSaving) ? 'background-color: #9ca3af; cursor: not-allowed;' : ''"
+              @mouseover="selectedFileName && !isSaving && (this.style.backgroundColor='#2563eb')"
+              @mouseout="selectedFileName && !isSaving && (this.style.backgroundColor='#3b82f6')"
+            >
+              <svg v-if="!isSaving" style="width: 1rem; height: 1rem; margin-right: 0.5rem; display: inline-block; vertical-align: middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+              </svg>
+              <span v-if="isSaving">Saving...</span>
+              <span v-else>Save Design</span>
+            </button>
+            <button 
               @click="downloadDesign"
               :disabled="!selectedFileName"
               class="download-button"
@@ -196,6 +221,32 @@
               Download Design
             </button>
           </div>
+          
+          <!-- Save Success Message -->
+          <div v-if="saveMessage" style="
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            background-color: #10b981;
+            color: white;
+            text-align: center;
+            font-size: 0.875rem;
+          ">
+            {{ saveMessage }}
+          </div>
+          
+          <!-- Save Error Message -->
+          <div v-if="saveError" style="
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            background-color: #ef4444;
+            color: white;
+            text-align: center;
+            font-size: 0.875rem;
+          ">
+            {{ saveError }}
+          </div>
         </div>
       </div>
     </div>
@@ -206,6 +257,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { getProductById, getMockupImageByProductName } from "../data/products.js";
+import { saveDesign as saveDesignToStorage, cleanupExpiredDesigns } from "../utils/designStorage.js";
 
 const route = useRoute();
 const productId = computed(() => route.params.id);
@@ -297,6 +349,9 @@ onMounted(() => {
     selectedColor.value = product.value.colors?.[0] || "";
     selectedSize.value = product.value.sizes?.[0] || "";
   }
+  
+  // Clean up expired designs on mount
+  cleanupExpiredDesigns();
 });
 
 onBeforeUnmount(() => {
@@ -367,6 +422,12 @@ const updateMockupRect = () => {
 const selectedFileName = ref("");
 const fileInput = ref(null);
 let designImg = null;
+let designImageBase64 = null; // Store the original design image as base64
+
+// Save design state
+const isSaving = ref(false);
+const saveMessage = ref("");
+const saveError = ref("");
 
 const handleUpload = (e) => {
   const file = e.target.files[0];
@@ -374,6 +435,7 @@ const handleUpload = (e) => {
   selectedFileName.value = file.name;
   const reader = new FileReader();
   reader.onload = () => {
+    designImageBase64 = reader.result; // Store base64 for saving
     designImg = new Image();
     designImg.onload = () => drawPreview();
     designImg.src = reader.result;
@@ -444,6 +506,127 @@ const downloadDesign = async () => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+};
+
+/**
+ * Generate thumbnail from canvas (smaller preview image)
+ */
+const generateThumbnail = (canvas, maxWidth = 300, maxHeight = 300) => {
+  const thumbCanvas = document.createElement('canvas');
+  const thumbCtx = thumbCanvas.getContext('2d');
+  
+  const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1);
+  thumbCanvas.width = canvas.width * scale;
+  thumbCanvas.height = canvas.height * scale;
+  
+  thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+  return thumbCanvas.toDataURL('image/png', 0.8);
+};
+
+/**
+ * Save design to localStorage
+ */
+const saveDesign = async () => {
+  if (!selectedFileName.value || !designImg || !mockupImage.value) {
+    saveError.value = 'Please upload a design first';
+    setTimeout(() => { saveError.value = ''; }, 3000);
+    return;
+  }
+  
+  isSaving.value = true;
+  saveMessage.value = '';
+  saveError.value = '';
+  
+  try {
+    // Clean up expired designs first
+    cleanupExpiredDesigns();
+    
+    // Generate full preview canvas (mockup + design)
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = canvas.value.width;
+    previewCanvas.height = canvas.value.height;
+    const previewCtx = previewCanvas.getContext('2d');
+    
+    // Draw mockup
+    let exportRect = { x: 0, y: 0, w: previewCanvas.width, h: previewCanvas.height };
+    try {
+      const natW = mockupImage.value.naturalWidth || mockupImage.value.width;
+      const natH = mockupImage.value.naturalHeight || mockupImage.value.height;
+      exportRect = computeContainRect(previewCanvas.width, previewCanvas.height, natW, natH);
+      previewCtx.drawImage(mockupImage.value, exportRect.x, exportRect.y, exportRect.w, exportRect.h);
+    } catch (e) {
+      console.error('Error drawing mockup:', e);
+    }
+    
+    // Draw design on mockup
+    const area = {
+      x: exportRect.x + (printAreaConfig.value.left / 100) * exportRect.w,
+      y: exportRect.y + (printAreaConfig.value.top / 100) * exportRect.h,
+      w: (printAreaConfig.value.width / 100) * exportRect.w,
+      h: (printAreaConfig.value.height / 100) * exportRect.h
+    };
+    const aspect = designImg.width / designImg.height || 1;
+    let dw = area.w;
+    let dh = dw / aspect;
+    if (dh > area.h) {
+      dh = area.h;
+      dw = dh * aspect;
+    }
+    const dx = area.x + (area.w - dw) / 2;
+    const dy = area.y + (area.h - dh) / 2;
+    previewCtx.drawImage(designImg, dx, dy, dw, dh);
+    
+    // Generate thumbnail
+    const thumbnail = generateThumbnail(previewCanvas);
+    
+    // Get mockup image URL or convert to base64 if needed
+    let mockupImageData = getMockupImage();
+    if (mockupImage.value.complete) {
+      // Try to get base64 from mockup image if possible
+      try {
+        const mockupCanvas = document.createElement('canvas');
+        mockupCanvas.width = mockupImage.value.naturalWidth || mockupImage.value.width;
+        mockupCanvas.height = mockupImage.value.naturalHeight || mockupImage.value.height;
+        const mockupCtx = mockupCanvas.getContext('2d');
+        mockupCtx.drawImage(mockupImage.value, 0, 0);
+        mockupImageData = mockupCanvas.toDataURL('image/png');
+      } catch (e) {
+        // Keep original URL if conversion fails
+        console.warn('Could not convert mockup to base64, using URL:', e);
+      }
+    }
+    
+    // Prepare design data
+    const designData = {
+      name: `${product.value?.name || 'Custom Product'} - ${selectedFileName.value}`,
+      designImage: designImageBase64,
+      thumbnail: thumbnail,
+      mockupImage: mockupImageData,
+      productName: product.value?.name || 'Custom Product',
+      productPrice: product.value?.price || 100000,
+      productCurrency: product.value?.currency || 'VNĐ',
+      printAreaConfig: { ...printAreaConfig.value },
+      selectedColor: selectedColor.value,
+      selectedSize: selectedSize.value
+    };
+    
+    // Save to localStorage
+    const designId = saveDesignToStorage(designData);
+    
+    saveMessage.value = 'Design saved successfully! It will expire in 30 days.';
+    setTimeout(() => { saveMessage.value = ''; }, 5000);
+    
+  } catch (error) {
+    console.error('Error saving design:', error);
+    if (error.message.includes('quota')) {
+      saveError.value = 'Storage is full. Please delete some old designs and try again.';
+    } else {
+      saveError.value = error.message || 'Failed to save design. Please try again.';
+    }
+    setTimeout(() => { saveError.value = ''; }, 5000);
+  } finally {
+    isSaving.value = false;
+  }
 };
 
 </script>
