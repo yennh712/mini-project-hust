@@ -58,12 +58,21 @@ export const saveDesign = (designData) => {
     const now = Date.now();
     const expiresAt = now + (EXPIRY_DAYS * 24 * 60 * 60 * 1000);
     
+    // Estimate size before saving
+    const estimatedSize = estimateDesignSize(designData);
+    const storageInfo = getStorageInfo();
+    
+    // Check if we have enough space (leave 500KB buffer)
+    if (storageInfo.used + estimatedSize > storageInfo.limit - 500 * 1024) {
+      throw new Error('Storage is almost full. Please delete some old designs first.');
+    }
+    
     const newDesign = {
       id: `design_${now}_${Math.random().toString(36).substr(2, 9)}`,
       name: designData.name || `Design ${new Date().toLocaleDateString()}`,
-      designImage: designData.designImage, // base64 string
-      thumbnail: designData.thumbnail, // base64 string (smaller preview)
-      mockupImage: designData.mockupImage, // URL or base64
+      designImage: designData.designImage, // Compressed base64 string
+      thumbnail: designData.thumbnail, // Small thumbnail (150x150, JPEG)
+      mockupImage: designData.mockupImage, // URL only (not base64 to save space)
       productName: designData.productName || 'Custom Product',
       productPrice: designData.productPrice || 100000,
       productCurrency: designData.productCurrency || 'VNĐ',
@@ -75,6 +84,9 @@ export const saveDesign = (designData) => {
       },
       selectedColor: designData.selectedColor || '',
       selectedSize: designData.selectedSize || '',
+      mockupId: designData.mockupId || null,
+      mockupColor: designData.mockupColor || null,
+      isCustomProduct: designData.isCustomProduct || false,
       createdAt: now,
       expiresAt: expiresAt,
       updatedAt: now
@@ -85,11 +97,28 @@ export const saveDesign = (designData) => {
     
     return newDesign.id;
   } catch (error) {
-    if (error.message.includes('quota')) {
+    if (error.message.includes('quota') || error.message.includes('full')) {
       throw error;
     }
     console.error('Error saving design:', error);
     throw new Error('Failed to save design. Please try again.');
+  }
+};
+
+/**
+ * Estimate the size of a design object in bytes
+ */
+const estimateDesignSize = (designData) => {
+  try {
+    // Estimate base64 size (base64 is ~33% larger than binary)
+    const designSize = designData.designImage ? Math.ceil(designData.designImage.length * 0.75) : 0;
+    const thumbnailSize = designData.thumbnail ? Math.ceil(designData.thumbnail.length * 0.75) : 0;
+    const otherDataSize = JSON.stringify(designData).length - (designData.designImage?.length || 0) - (designData.thumbnail?.length || 0);
+    
+    return designSize + thumbnailSize + otherDataSize;
+  } catch (error) {
+    // Fallback estimate: assume 500KB per design
+    return 500 * 1024;
   }
 };
 

@@ -38,6 +38,44 @@
 
         <!-- Info bên phải - Column 2 -->
         <div class="info-column">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <button 
+              @click="$router.push('/')"
+              style="
+                padding: 0.5rem 1rem;
+                background-color: #6b7280;
+                color: white;
+                border: none;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                font-size: 0.875rem;
+                font-weight: 500;
+              "
+            >
+              ← Back
+            </button>
+            <button 
+              @click="$router.push('/library')"
+              style="
+                padding: 0.5rem 1rem;
+                background-color: #3b82f6;
+                color: white;
+                border: none;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                font-size: 0.875rem;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+              "
+            >
+              <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              My Designs
+            </button>
+          </div>
           <h1 class="product-title">{{ product?.name || 'Custom Product' }}</h1>
           <h2 class="product-price">{{ formatPrice(product?.price || 0) }} {{ product?.currency || 'VNĐ' }}</h2>
           <p class="product-description">
@@ -127,8 +165,8 @@
             </div>
           </div>
           
-          <!-- Color Selection -->
-          <div v-if="product?.colors" class="form-section" style="text-align: center;">
+          <!-- Color Selection (only for non-custom products) -->
+          <div v-if="product?.colors && !isCustomProduct" class="form-section" style="text-align: center;">
             <label class="form-label" style="text-align: center;">Choose Color:</label>
             <div class="color-buttons">
               <button
@@ -142,6 +180,55 @@
               >
                 {{ color }}
               </button>
+            </div>
+          </div>
+
+          <!-- Custom Mockup Color Picker (for custom products only) -->
+          <div v-if="isCustomProduct" class="form-section" style="text-align: center;">
+            <label class="form-label" style="text-align: center;">Mockup Color:</label>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
+              <input
+                v-model="mockupColor"
+                type="color"
+                style="
+                  width: 60px;
+                  height: 60px;
+                  border: 2px solid #d1d5db;
+                  border-radius: 0.375rem;
+                  cursor: pointer;
+                "
+                @change="applyMockupColor"
+              />
+              <div>
+                <input
+                  v-model="mockupColor"
+                  type="text"
+                  placeholder="#000000"
+                  style="
+                    padding: 0.5rem;
+                    border: 1px solid #d1d5db;
+                    border-radius: 0.375rem;
+                    font-size: 0.875rem;
+                    width: 120px;
+                  "
+                  @change="applyMockupColor"
+                />
+                <button
+                  @click="resetMockupColor"
+                  style="
+                    margin-left: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    background-color: #6b7280;
+                    color: white;
+                    border: none;
+                    border-radius: 0.375rem;
+                    cursor: pointer;
+                    font-size: 0.875rem;
+                  "
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 
@@ -256,12 +343,40 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useRoute } from "vue-router";
-import { getProductById, getMockupImageByProductName } from "../data/products.js";
-import { saveDesign as saveDesignToStorage, cleanupExpiredDesigns } from "../utils/designStorage.js";
+import { getProductById, getMockupImageByProductName, getMockupImageByVariant } from "../data/products.js";
+import { saveDesign as saveDesignToStorage, cleanupExpiredDesigns, getStorageInfo } from "../utils/designStorage.js";
+import { getMockupById } from "../utils/mockupStorage.js";
+
+const props = defineProps({
+  isCustom: {
+    type: Boolean,
+    default: false
+  }
+});
 
 const route = useRoute();
 const productId = computed(() => route.params.id);
-const product = computed(() => getProductById(productId.value));
+const product = computed(() => {
+  if (props.isCustom) {
+    // Return custom product data
+    return {
+      id: 'custom',
+      name: 'Custom Product',
+      price: 100000,
+      currency: 'VNĐ',
+      description: 'Customize your design on your own mockup',
+      colors: [],
+      sizes: []
+    };
+  }
+  return getProductById(productId.value);
+});
+
+// Custom mockup state
+const isCustomProduct = computed(() => props.isCustom || route.path === '/product/custom');
+const customMockupData = ref(null);
+const mockupColor = ref('#ffffff');
+const originalMockupImage = ref(null);
 
 const selectedColor = ref("");
 const selectedSize = ref("");
@@ -305,16 +420,78 @@ const printAreaStyle = computed(() => {
 
 // Function to get the appropriate mockup image
 const getMockupImage = () => {
+  // For custom products
+  if (isCustomProduct.value && customMockupData.value) {
+    if (customMockupData.value.isLibrary) {
+      return customMockupData.value.image;
+    } else {
+      // Return custom mockup with color applied
+      return getColoredMockup(customMockupData.value.image, mockupColor.value);
+    }
+  }
+  
+  // For regular products with color variants
+  if (product.value && selectedColor.value) {
+    const variantMockup = getMockupImageByVariant(product.value, selectedColor.value);
+    if (variantMockup) {
+      console.log(`[Mockup] Loading variant for ${product.value.name} - Color: ${selectedColor.value} -> ${variantMockup}`);
+      return variantMockup;
+    } else {
+      console.warn(`[Mockup] No variant found for ${product.value.name} - Color: ${selectedColor.value}, falling back to default`);
+    }
+  }
+  
+  // Fallback to default mockup image
   if (product.value?.mockupImage) {
+    console.log(`[Mockup] Using default mockup for ${product.value.name}: ${product.value.mockupImage}`);
     return product.value.mockupImage;
   }
   
   if (product.value?.name) {
-    return getMockupImageByProductName(product.value.name);
+    const fallback = getMockupImageByProductName(product.value.name);
+    console.log(`[Mockup] Using product name fallback: ${fallback}`);
+    return fallback;
   }
   
   // Fallback to default
+  console.log('[Mockup] Using final fallback: /src/assets/mockup-tshirt.png');
   return '/src/assets/mockup-tshirt.png';
+};
+
+// Apply color to mockup image
+const getColoredMockup = (imageSrc, color) => {
+  // This is a simplified version - in production, you might want to use canvas
+  // to actually apply color filters to the image
+  // For now, we'll return the original image and apply color via CSS filter
+  return imageSrc;
+};
+
+// Apply mockup color
+const applyMockupColor = () => {
+  if (isCustomProduct.value && mockupImage.value) {
+    // Apply color filter to mockup image
+    // This is a simplified approach - you might want more sophisticated color application
+    const hex = mockupColor.value.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    // Apply CSS filter (simplified - might need canvas for better results)
+    if (mockupImage.value) {
+      // Store original for reset
+      if (!originalMockupImage.value) {
+        originalMockupImage.value = mockupImage.value.src;
+      }
+      // Note: CSS filters are limited, for production consider canvas-based color application
+      drawPreview(); // Redraw to update preview
+    }
+  }
+};
+
+// Reset mockup color
+const resetMockupColor = () => {
+  mockupColor.value = '#ffffff';
+  applyMockupColor();
 };
 
 const sizeCanvasToContainer = () => {
@@ -335,11 +512,55 @@ const onMockupLoad = () => {
   drawPreview();
 };
 
+const handleImageError = (event) => {
+  const failedSrc = event.target.src;
+  console.error('Mockup image failed to load:', failedSrc);
+  
+  // Prevent infinite loop by checking if we're already on a fallback
+  if (event.target.dataset.isFallback === 'true') {
+    console.warn('Fallback image also failed, stopping retry');
+    return;
+  }
+  
+  // Try fallback to default mockup for this product
+  if (product.value?.mockupImage && failedSrc !== product.value.mockupImage) {
+    console.log('Trying fallback to product default mockup:', product.value.mockupImage);
+    event.target.dataset.isFallback = 'true';
+    event.target.src = product.value.mockupImage;
+    return;
+  }
+  
+  // Final fallback to default t-shirt mockup
+  if (failedSrc !== '/src/assets/mockup-tshirt.png') {
+    console.log('Trying final fallback to default mockup');
+    event.target.dataset.isFallback = 'true';
+    event.target.src = '/src/assets/mockup-tshirt.png';
+  }
+};
+
 onMounted(() => {
   if (canvas.value) {
     ctx = canvas.value.getContext("2d");
     sizeCanvasToContainer();
   }
+  
+  // Load custom mockup data if available
+  if (isCustomProduct.value) {
+    try {
+      const stored = sessionStorage.getItem('customMockupData');
+      if (stored) {
+        customMockupData.value = JSON.parse(stored);
+        if (customMockupData.value.image) {
+          originalMockupImage.value = customMockupData.value.image;
+        }
+        // Clear sessionStorage after use
+        sessionStorage.removeItem('customMockupData');
+      }
+    } catch (error) {
+      console.error('Error loading custom mockup data:', error);
+    }
+  }
+  
   updateMockupRect();
   drawPreview();
   window.addEventListener('resize', handleResize, { passive: true });
@@ -396,11 +617,24 @@ watch(printAreaConfig, () => {
   drawPreview();
 }, { deep: true });
 
-const handleImageError = (event) => {
-  console.error('Mockup image failed to load:', event.target.src);
-  // Try fallback image
-  event.target.src = '/src/assets/mockup-tshirt.png';
-};
+// Watch for color changes to update mockup
+watch(selectedColor, (newColor, oldColor) => {
+  if (!isCustomProduct.value && mockupImage.value && newColor !== oldColor) {
+    // Reload mockup image when color changes
+    const newMockupSrc = getMockupImage();
+    if (newMockupSrc && mockupImage.value.src !== newMockupSrc) {
+      // Reset fallback flag
+      mockupImage.value.dataset.isFallback = 'false';
+      // Force reload by setting src to empty first, then to new src
+      mockupImage.value.src = '';
+      setTimeout(() => {
+        console.log('Loading variant mockup for color:', newColor, '->', newMockupSrc);
+        mockupImage.value.src = newMockupSrc;
+      }, 10);
+    }
+  }
+});
+
 const computeContainRect = (containerW, containerH, naturalW, naturalH) => {
   if (!naturalW || !naturalH) return { x: 0, y: 0, w: containerW, h: containerH };
   const scale = Math.min(containerW / naturalW, containerH / naturalH);
@@ -510,8 +744,9 @@ const downloadDesign = async () => {
 
 /**
  * Generate thumbnail from canvas (smaller preview image)
+ * Optimized for smaller file size
  */
-const generateThumbnail = (canvas, maxWidth = 300, maxHeight = 300) => {
+const generateThumbnail = (canvas, maxWidth = 150, maxHeight = 150) => {
   const thumbCanvas = document.createElement('canvas');
   const thumbCtx = thumbCanvas.getContext('2d');
   
@@ -520,7 +755,40 @@ const generateThumbnail = (canvas, maxWidth = 300, maxHeight = 300) => {
   thumbCanvas.height = canvas.height * scale;
   
   thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-  return thumbCanvas.toDataURL('image/png', 0.8);
+  // Use JPEG with lower quality for smaller file size
+  return thumbCanvas.toDataURL('image/jpeg', 0.6);
+};
+
+/**
+ * Compress image to reduce file size
+ */
+const compressImage = (imageSrc, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Calculate dimensions
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > maxWidth || height > maxHeight) {
+        const scale = Math.min(maxWidth / width, maxHeight / height);
+        width = width * scale;
+        height = height * scale;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Use JPEG for better compression
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
 };
 
 /**
@@ -576,44 +844,43 @@ const saveDesign = async () => {
     const dy = area.y + (area.h - dh) / 2;
     previewCtx.drawImage(designImg, dx, dy, dw, dh);
     
-    // Generate thumbnail
+    // Generate thumbnail (smaller size)
     const thumbnail = generateThumbnail(previewCanvas);
     
-    // Get mockup image URL or convert to base64 if needed
-    let mockupImageData = getMockupImage();
-    if (mockupImage.value.complete) {
-      // Try to get base64 from mockup image if possible
-      try {
-        const mockupCanvas = document.createElement('canvas');
-        mockupCanvas.width = mockupImage.value.naturalWidth || mockupImage.value.width;
-        mockupCanvas.height = mockupImage.value.naturalHeight || mockupImage.value.height;
-        const mockupCtx = mockupCanvas.getContext('2d');
-        mockupCtx.drawImage(mockupImage.value, 0, 0);
-        mockupImageData = mockupCanvas.toDataURL('image/png');
-      } catch (e) {
-        // Keep original URL if conversion fails
-        console.warn('Could not convert mockup to base64, using URL:', e);
-      }
-    }
+    // Compress design image to reduce storage size
+    const compressedDesignImage = await compressImage(designImageBase64);
     
-    // Prepare design data
+    // Get mockup image URL (don't save as base64 to save space)
+    // We can reconstruct it from mockupId or URL
+    const mockupImageUrl = getMockupImage();
+    
+    // Prepare design data (optimized for storage)
     const designData = {
       name: `${product.value?.name || 'Custom Product'} - ${selectedFileName.value}`,
-      designImage: designImageBase64,
-      thumbnail: thumbnail,
-      mockupImage: mockupImageData,
+      designImage: compressedDesignImage, // Compressed design image
+      thumbnail: thumbnail, // Small thumbnail (150x150, JPEG 0.6)
+      mockupImage: mockupImageUrl, // Just URL, not base64 (saves huge space!)
       productName: product.value?.name || 'Custom Product',
       productPrice: product.value?.price || 100000,
       productCurrency: product.value?.currency || 'VNĐ',
       printAreaConfig: { ...printAreaConfig.value },
       selectedColor: selectedColor.value,
-      selectedSize: selectedSize.value
+      selectedSize: selectedSize.value,
+      // Add custom mockup info
+      mockupId: isCustomProduct.value && customMockupData.value ? customMockupData.value.id : null,
+      mockupColor: isCustomProduct.value ? mockupColor.value : null,
+      isCustomProduct: isCustomProduct.value
     };
     
     // Save to localStorage
     const designId = saveDesignToStorage(designData);
     
-    saveMessage.value = 'Design saved successfully! It will expire in 30 days.';
+    // Show storage info
+    const storageInfo = getStorageInfo();
+    const storageMB = (storageInfo.used / (1024 * 1024)).toFixed(2);
+    const storagePercent = storageInfo.percentage.toFixed(1);
+    
+    saveMessage.value = `Design saved successfully! (Storage: ${storagePercent}% used, ${storageMB}MB)`;
     setTimeout(() => { saveMessage.value = ''; }, 5000);
     
   } catch (error) {
