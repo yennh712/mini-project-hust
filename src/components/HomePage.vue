@@ -307,6 +307,7 @@
                 background-color: #3b82f6;
                 color: white;
                 border: none;
+                margin: 1rem;
                 padding: '0.5rem 1.5rem';
                 borderRadius: '0.375rem';
                 fontSize: '0.875rem';

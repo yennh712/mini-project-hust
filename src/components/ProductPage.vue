@@ -84,7 +84,7 @@
           
           <!-- Print Area Settings (Optional - for testing/adjustment) -->
           <div class="form-section" style="background-color: #f8fafc; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
-            <label class="form-label">Print Area Settings (for testing):</label>
+            <label class="form-label">Print Area Settings:</label>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
               <div>
                 <label style="font-size: 0.75rem; color: #6b7280;">Top (%)</label>
